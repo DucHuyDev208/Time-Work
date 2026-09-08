@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Work Manager</title>
+<style>
+:root{
+  --bg:#070b14;--panel:#0d1422;--card:#111b2c;--line:#1e2a3d;
+  --text:#e8f0ff;--muted:#8391a8;--accent:#38bdf8;--accent2:#818cf8;
+  --good:#34d399;--danger:#fb7185;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 80% -10%,#172a46 0,#070b14 42%);color:var(--text);
+font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+.app{max-width:980px;margin:auto;padding:18px 14px 28px}
+.header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:46px;height:46px;border:1px solid #2b5875;border-radius:14px;
+display:grid;place-items:center;background:linear-gradient(145deg,#102238,#0b1321);color:#7dd3fc;font-weight:900;letter-spacing:-1px;box-shadow:0 0 28px #38bdf81c}
+h1{font-size:22px;line-height:1.1;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.02em}
+.install{display:none;border:1px solid #27506a;background:#0d2133;color:#b9eaff;border-radius:12px;padding:9px 12px;font-weight:700;min-height:42px}
+.hero{background:linear-gradient(135deg,#0e192b,#0b1220);border:1px solid var(--line);border-radius:18px;padding:16px;
+box-shadow:0 14px 45px #00000022;margin-bottom:14px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px 3px}
+select,input{width:100%;min-height:44px;background:#0a111e;color:var(--text);border:1px solid #223149;border-radius:11px;padding:9px 11px;font:inherit;font-size:16px;outline:none}
+select:focus,input:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf81a}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.stat{background:rgba(13,20,34,.9);border:1px solid var(--line);border-radius:15px;padding:14px;position:relative;overflow:hidden}
+.stat:after{content:"";position:absolute;inset:auto -20px -30px auto;width:90px;height:90px;border-radius:50%;background:#38bdf812}
+.stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.stat b{display:block;font-size:22px;margin-top:5px}
+.table-card{background:rgba(10,16,28,.92);border:1px solid var(--line);border-radius:17px;overflow:hidden}
+.table-scroll{overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:700px}
+th,td{padding:10px 9px;border-bottom:1px solid #172235;text-align:left}
+th{font-size:11px;color:#77869d;text-transform:uppercase;letter-spacing:.06em;background:#0c1422;position:sticky;top:0}
+td{font-size:14px}.day{font-weight:800;color:#cbd5e1}.total{font-weight:800;color:var(--good);white-space:nowrap}
+td input{min-height:40px;background:#0b1423;border-color:#1e3047}
+.footer{display:flex;justify-content:space-between;gap:10px;margin-top:12px;color:var(--muted);font-size:12px}
+.clear{background:transparent;color:#94a3b8;border:1px solid #24334a;border-radius:10px;padding:7px 10px;min-height:38px}
+@media(max-width:600px){.app{padding:14px 10px 24px}.header{align-items:flex-start}.stats{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.install{display:block}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">
+      <div class="logo">WM</div>
+      <div><h1>Work Manager</h1><div class="sub">WORK TIME • SMART TRACKING</div></div>
+    </div>
+    <button id="install" class="install">Cài đặt app</button>
+  </header>
+
+  <section class="hero">
+    <div class="controls">
+      <div><label>Tháng</label><select id="month"></select></div>
+      <div><label>Năm</label><select id="year"></select></div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><div class="k">Tổng giờ</div><b id="sum">0:00</b></div>
+    <div class="stat"><div class="k">Ngày làm</div><b id="days">0</b></div>
+    <div class="stat"><div class="k">Ngày nghỉ</div><b id="off">0</b></div>
+  </section>
+
+  <section class="table-card">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Ngày</th><th>Giờ vào</th><th>Giờ ra</th><th>Nghỉ ca gãy</th><th>Tổng giờ</th></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+  </section>
+  <div class="footer"><span>Dữ liệu tự lưu trên thiết bị</span><button id="clear" class="clear">Xóa dữ liệu tháng</button></div>
+</div>
+
+<script>
+(() => {
+  const storeKey="work_manager_data_v2";
+  const state=JSON.parse(localStorage.getItem(storeKey)||"{}");
+  const now=new Date(); let sm=now.getMonth(), sy=now.getFullYear();
+  const month=document.querySelector("#month"), year=document.querySelector("#year"), body=document.querySelector("#body");
+  const sum=document.querySelector("#sum"), days=document.querySelector("#days"), off=document.querySelector("#off");
+  for(let m=0;m<12;m++){let o=document.createElement("option");o.value=m;o.textContent="Tháng "+(m+1);month.appendChild(o)}
+  for(let y=2024;y<=2035;y++){let o=document.createElement("option");o.value=y;o.textContent=y;year.appendChild(o)}
+  month.value=sm;year.value=sy;
+
+  const key=()=>`${sy}-${String(sm+1).padStart(2,"0")}`;
+  const dim=()=>new Date(sy,sm+1,0).getDate();
+  function ensure(){
+    if(!state[key()]) state[key()]=Array.from({length:dim()},(_,i)=>({date:i+1,in:"",out:"",br:""}));
+    else {
+      while(state[key()].length<dim()) state[key()].push({date:state[key()].length+1,in:"",out:"",br:""});
+      state[key()].length=dim();
+    }
+  }
+  function save(){localStorage.setItem(storeKey,JSON.stringify(state))}
+  function mins(v){
+    if(!v)return 0;
+    const p=v.split(":").map(Number);
+    if(p.length!==2||!Number.isFinite(p[0])||!Number.isFinite(p[1])||p[0]<0||p[0]>23||p[1]<0||p[1]>59)return null;
+    return p[0]*60+p[1];
+  }
+  function calc(r){
+    if(!r.in||!r.out)return null;
+    const a=mins(r.in),b=mins(r.out),br=mins(r.br);
+    if(a===null||b===null||br===null)return null;
+    let d=b-a;if(d<0)d+=1440;return Math.max(0,d-br);
+  }
+  function fmt(n){return n===null?"—":`${Math.floor(n/60)}:${String(n%60).padStart(2,"0")}`}
+  function update(){
+    let total=0,worked=0;
+    state[key()].forEach((r,i)=>{const c=calc(r);if(body.children[i])body.children[i].children[4].textContent=fmt(c);if(c!==null){total+=c;worked++}});
+    sum.textContent=fmt(total);days.textContent=worked;off.textContent=Math.max(0,dim()-worked);
+  }
+  function render(){
+    ensure();body.innerHTML="";
+    state[key()].forEach((r,i)=>{
+      const tr=document.createElement("tr");
+      const d=document.createElement("td");d.className="day";d.textContent=String(i+1).padStart(2,"0")+"/"+String(sm+1).padStart(2,"0");tr.appendChild(d);
+      [["in","time"],["out","time"],["br","text"]].forEach(([n,t])=>{
+        const td=document.createElement("td"),x=document.createElement("input");x.type=t;x.value=r[n]||"";x.placeholder=n==="br"?"0:00":"";
+        x.setAttribute("aria-label",n==="in"?"Giờ vào":n==="out"?"Giờ ra":"Nghỉ ca gãy");
+        x.addEventListener("input",()=>{r[n]=x.value;save();update()});td.appendChild(x);tr.appendChild(td);
+      });
+      const total=document.createElement("td");total.className="total";total.textContent=fmt(calc(r));tr.appendChild(total);body.appendChild(tr);
+    });
+    save();update();
+  }
+  month.addEventListener("change",()=>{sm=Number(month.value);render()});
+  year.addEventListener("change",()=>{sy=Number(year.value);render()});
+  document.querySelector("#clear").addEventListener("click",()=>{
+    if(confirm("Xóa toàn bộ dữ liệu của tháng này?")){delete state[key()];render()}
+  });
+
+  let deferredPrompt=null;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.querySelector("#install").style.display="block"});
+  document.querySelector("#install").addEventListener("click",async()=>{
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null;
+    document.querySelector("#install").style.display="none";
+  });
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  render();
+})();
+</script>
+</body>
+</html>
